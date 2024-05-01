@@ -27,17 +27,14 @@ Magnification_factor = Npix_horizontal * Pixel_pitch * 1e-6 / FOV_length
 Object_distance = Camera_focal_length * (1 + 1 / Magnification_factor)  # in [mm]
 Image_distance = Camera_focal_length * (1 + Magnification_factor)  # in [mm]
 
-foo = 0
-
+# Laser specs
 Wavelength = 532e-3  # in [microm]
 
+# Tracing particle specs
 Particle_mean_diameter = 1.068  # in [micro m]
 
 fStop_range = np.linspace(fStop_min, fStop_max, 1001)
 Particle_image_diameter_range = piv_f.particle_image_diameter(Particle_mean_diameter, Magnification_factor, Wavelength,
-                                                        fStop_range)
-
-
-
-
+                                                              fStop_range)
+# Selected fStop
 fStop = 9.7
