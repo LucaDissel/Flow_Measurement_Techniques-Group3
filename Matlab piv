@@ -1,0 +1,75 @@
+% Matlab code, needs to be fixed
+
+clear all;
+clc;
+close all;
+
+%Read images
+imagea = imread('Image_0001_a.tif');
+imageb = imread('Image_0001_b.tif');
+
+%overall dimensions
+[xmax,ymax] = size(imagea);
+% x=rows, y=columns
+
+%Define window size in pixels
+wsize = [32,32];
+w_width = wsize(1);
+w_height = wsize(2);
+
+%Define windows across the grid, xgrid(i) = x coord of centre of grid #i
+xgrid = 70:w_width:970;
+ygrid = 70:w_height:1306; %start coordinate, interval, end coordinate
+
+%Number of windows:
+w_xcount = length(xgrid);
+w_ycount = length(ygrid);
+%nx=2*floor((xmax-w_width)/(w_width-1));
+%ny=2*floor((ymax-w_height)/(w_height-1));
+
+%Define search zone using max x/y displacement per timestep:
+x_disp_max = 32;
+y_disp_max = 32;
+
+%Test image:
+test_ima(w_width,w_height) = 0; % 1 window from image a
+test_imb(w_width+2*x_disp_max,w_height+2*y_disp_max) = 0; %search zone in image b
+%xpeak1=0;
+%xpeak2=0;
+
+%for every window:
+for i=1:(w_xcount)
+    for j=1:(w_ycount)
+        max_correlation = 0;
+        test_xmin = xgrid(i)-w_width;
+        test_xmax = xgrid(i)+w_width;
+        test_ymin = ygrid(j)-w_height;
+        test_ymax = ygrid(j)+w_height;
+        dpx(i,j)=0; %displacement in x
+        dpy(i,j)=0; %displacement in y
+        
+        %window from image a
+        test_ima=imagea(test_xmin:test_xmax,test_ymin:test_ymax);
+                
+        %search zone from image b
+        test_imb=imageb((test_xmin-x_disp_max):(test_xmax+x_disp_max),...
+            (test_ymin-y_disp_max):(test_ymax+y_disp_max));
+        
+        %normalised 2d cross correlation
+        correlation = normxcorr2(test_ima,test_imb);
+        %correlation = normxcorr2(test_ima,imageb);
+        [xpeak,ypeak] = find(correlation == max(correlation(:)));
+        R = max(correlation(:));
+
+        %rescaling
+        %xpeak1 = test_xmin+xpeak - wsize(1)/2 - x_disp_max;
+        %ypeak1 = test_ymin+ypeak - wsize(2)/2 - y_disp_max;
+        
+        dpx(i,j) = xpeak - xgrid(i);
+        dpy(i,j) = ypeak - ygrid(j);
+    end
+end
+
+%velocity field vector plot
+figure
+quiver(dpy,-dpx)
