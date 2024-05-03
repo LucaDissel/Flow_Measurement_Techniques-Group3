@@ -10,7 +10,6 @@ imageb = imread('Image_0001_b.tif');
 
 %overall dimensions
 [xmax,ymax] = size(imagea);
-% x=rows, y=columns
 
 %Define window size in pixels
 wsize = [32,32];
@@ -24,8 +23,6 @@ ygrid = 70:w_height:1306; %start coordinate, interval, end coordinate
 %Number of windows:
 w_xcount = length(xgrid);
 w_ycount = length(ygrid);
-%nx=2*floor((xmax-w_width)/(w_width-1));
-%ny=2*floor((ymax-w_height)/(w_height-1));
 
 %Define search zone using max x/y displacement per timestep:
 x_disp_max = 32;
@@ -59,7 +56,6 @@ for i=1:(w_xcount)
         correlation = normxcorr2(test_ima,test_imb);
         %correlation = normxcorr2(test_ima,imageb);
         [xpeak,ypeak] = find(correlation == max(correlation(:)));
-        R = max(correlation(:));
 
         %rescaling
         %xpeak1 = test_xmin+xpeak - wsize(1)/2 - x_disp_max;
