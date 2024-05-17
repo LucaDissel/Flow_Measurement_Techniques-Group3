@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 from scipy.signal import correlate2d
 import os
 import sys
-import pathlib
-
-from openpiv import tools, pyprocess, validation, filters, scaling
 
 # ---------- Step 1: Load and average the images ----------
 # Define the path to the images
@@ -111,7 +108,7 @@ for y in range(num_windows_y):
             continue
 
         # Cross-correlate the window with the search window
-        result = cv2.matchTemplate(search_b, window_a, cv2.TM_CCORR_NORMED)
+        result = cv2.matchTemplate(search_b, window_a, cv2.TM_CCOEFF_NORMED)
         _, _, _, max_loc = cv2.minMaxLoc(result)
 
         # Compute the displacement
@@ -140,7 +137,8 @@ y = np.arange(0, rows) * (pixel_pitch / magnification * 1000)
 X, Y = np.meshgrid(x, y)
 
 plt.figure(figsize=(10, 8))
-cp = plt.contourf(X, Y, V, 25, cmap='viridis', zorder=1)              # '25' is the number of levels in contour, 'viridis' is the colormap
+cp = plt.contourf(X, Y, V, 25, cmap='viridis', zorder=1)
+plt.quiver(X[::64, ::64], Y[::64, ::64], u[::64, ::64], v[::64, ::64], color='red', scale=500, zorder=2)
 
 # Load and process the mask for overlay
 mask_rgb = cv2.imread(os.path.join(folder_path, 'Mask.tif'), cv2.IMREAD_GRAYSCALE)
@@ -167,7 +165,7 @@ mask_overlay_white = np.zeros((*mask_dilated_inverted.shape, 4), dtype=np.uint8)
 mask_overlay_white[mask_dilated_inverted == 0, :] = [255, 255, 255, 255]
 
 # Overlay the mask on the plot
-plt.imshow(mask_overlay_white, extent=[0, max(x), max(y), 0], aspect='auto', zorder=2)
+plt.imshow(mask_overlay_white, extent=[0, max(x), max(y), 0], aspect='auto', zorder=3)
 
 plt.colorbar(cp)                                            # Adds a colorbar to show the magnitude scale
 plt.title('Instantaneous velocity field at α=15°')
