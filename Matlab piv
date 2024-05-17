@@ -1,71 +1,105 @@
-% Matlab code, needs to be fixed
+%piv3
 
 clear all;
 clc;
 close all;
 
-%Read images
-imagea = imread('Image_0001_a.tif');
-imageb = imread('Image_0001_b.tif');
+% Read single image pair
+imgname = "B00005.tif";
+im = imread(imgname);
+imagea = im(1:1236,1:1624);
+imageb = im(1237:2472,1:1624);
 
-%overall dimensions
-[xmax,ymax] = size(imagea);
+% % Read 2 distinct images
+% imagea = imread('Image_0001_a.tif');
+% imageb = imread('Image_0001_b.tif');
 
-%Define window size in pixels
-wsize = [32,32];
-w_width = wsize(1);
-w_height = wsize(2);
+% Variables
+pp = 4.4e-6;
+M = 0.04775;
+fstop = 5.6;
+ts = 73.72e-6;
+ws = 32;
+overlap = 8;
 
-%Define windows across the grid, xgrid(i) = x coord of centre of grid #i
-xgrid = 70:w_width:970;
-ygrid = 70:w_height:1306; %start coordinate, interval, end coordinate
+% Get the size of the images
+[rows, cols] = size(imagea);
+step = ws - overlap;
+num_x = floor((cols - overlap) / step);
+num_y = floor((rows - overlap) / step);
 
-%Number of windows:
-w_xcount = length(xgrid);
-w_ycount = length(ygrid);
+% Initialize the displacement fields
+u = zeros(num_y, num_x);
+v = zeros(num_y, num_x);
+ 
+% Initialize the grid for velocity vectors
+x = zeros(num_y, num_x);
+y = zeros(num_y, num_x);
 
-%Define search zone using max x/y displacement per timestep:
-x_disp_max = 32;
-y_disp_max = 32;
-
-%Test image:
-test_ima(w_width,w_height) = 0; % 1 window from image a
-test_imb(w_width+2*x_disp_max,w_height+2*y_disp_max) = 0; %search zone in image b
-%xpeak1=0;
-%xpeak2=0;
-
-%for every window:
-for i=1:(w_xcount)
-    for j=1:(w_ycount)
-        max_correlation = 0;
-        test_xmin = xgrid(i)-w_width;
-        test_xmax = xgrid(i)+w_width;
-        test_ymin = ygrid(j)-w_height;
-        test_ymax = ygrid(j)+w_height;
-        dpx(i,j)=0; %displacement in x
-        dpy(i,j)=0; %displacement in y
-        
-        %window from image a
-        test_ima=imagea(test_xmin:test_xmax,test_ymin:test_ymax);
-                
-        %search zone from image b
-        test_imb=imageb((test_xmin-x_disp_max):(test_xmax+x_disp_max),...
-            (test_ymin-y_disp_max):(test_ymax+y_disp_max));
-        
-        %normalised 2d cross correlation
-        correlation = normxcorr2(test_ima,test_imb);
-        %correlation = normxcorr2(test_ima,imageb);
-        [xpeak,ypeak] = find(correlation == max(correlation(:)));
-
-        %rescaling
-        %xpeak1 = test_xmin+xpeak - wsize(1)/2 - x_disp_max;
-        %ypeak1 = test_ymin+ypeak - wsize(2)/2 - y_disp_max;
-        
-        dpx(i,j) = xpeak - xgrid(i);
-        dpy(i,j) = ypeak - ygrid(j);
+% Loop over each interrogation window
+for i = 1:num_y
+    text = sprintf('Running: Step %0.1f/%d',i,num_y);
+    disp(text)
+    for j = 1:num_x
+        % Define the window region
+        x_start = (j-1) * step + 1;
+        y_start = (i-1) * step + 1;
+        x_end = x_start + ws - 1;
+        y_end = y_start + ws - 1;
+           
+        % Extract the interrogation windows
+        win1 = imagea(y_start:y_end, x_start:x_end);
+        win2 = imageb(y_start:y_end, x_start:x_end);
+         
+        % Compute the cross-correlation
+        C = normxcorr2(win1, win2);
+         
+        % Find the peak in the cross-correlation matrix
+        [max_y, max_x] = find(C == max(C(:)), 1);
+         
+        % Calculate the displacement
+        dx = max_x - ws;
+        dy = max_y - ws;
+            
+        % Store the displacement
+        u(i, j) = dx;
+        v(i, j) = dy;
+            
+        % Store the center position of the interrogation window
+        x(i, j) = x_start + ws / 2;
+        y(i, j) = y_start + ws / 2;
     end
 end
 
-%velocity field vector plot
 figure
-quiver(dpy,-dpx)
+quiver(x, y, u, v, 'k')
+title('PIV Velocity Field')
+xlabel('X')
+ylabel('Y')
+axis equal
+
+% Calculate the velocity magnitude
+velocity_magnitude = sqrt(u.^2 + v.^2);
+ 
+% Create the contour plot
+figure;
+contourf(x, y, velocity_magnitude, 20); % 20 levels of contours
+colorbar;
+title('Velocity Magnitude Contourf Map');
+xlabel('X');
+ylabel('Y');
+axis equal;
+
+% Optionally, overlay velocity vectors
+% hold on;
+% quiver(x, y, u, v, 'k');
+% hold off;
+
+figure;
+contour(x, y, velocity_magnitude, 20); % 20 levels of contours
+colorbar;
+title('Velocity Magnitude Contour Map');
+xlabel('X');
+ylabel('Y');
+axis equal;
+
