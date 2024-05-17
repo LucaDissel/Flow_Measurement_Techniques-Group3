@@ -4,7 +4,7 @@ clc;
 close all;
 
 % Read single image pair
-im = imread("B00005.tif");
+im = imread("B00007.tif");
 imagea = im(1:1236,1:1624);
 imageb = im(1237:2472,1:1624);
 
@@ -17,8 +17,8 @@ pp = 4.4e-6; % [meters]
 M = 0.04775; % []
 fstop = 5.6; % []
 ts = 73.72e-6; % [s]
-ws = 64; % [px]
-overlap = 16; % [px]
+ws = 32; % [px]
+overlap = 0; % [px]
 search_win = 0.5*ws; % [px]
 
 % Get the size of the images
@@ -104,6 +104,10 @@ axis equal
 
 % Calculate the velocity magnitude
 velocity_magnitude = sqrt(u.^2 + v.^2);
+[j,k] =find(velocity_magnitude == min(velocity_magnitude(:)), 1);
+llim = velocity_magnitude(j,k);
+[j,k] =find(velocity_magnitude == max(velocity_magnitude(:)), 1);
+ulim = velocity_magnitude(j,k);
 
 % Create the contour plot
 figure Name Contourf;
@@ -120,9 +124,8 @@ axis equal;
 % hold off;
 
 figure Name Contour;
-contour(x, y, velocity_magnitude, 20); % 20 levels of contours
-colorbar;
-title('Velocity Magnitude Contour Map');
+pcolor(x, y, velocity_magnitude);
+title('Velocity Magnitude Pcolor Map');
 xlabel('X');
 ylabel('Y');
 axis equal;
