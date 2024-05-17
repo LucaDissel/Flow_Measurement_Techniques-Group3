@@ -1,12 +1,10 @@
 %piv3
-
 clear all;
 clc;
 close all;
 
 % Read single image pair
-imgname = "B00005.tif";
-im = imread(imgname);
+im = imread("B00005.tif");
 imagea = im(1:1236,1:1624);
 imageb = im(1237:2472,1:1624);
 
@@ -14,13 +12,14 @@ imageb = im(1237:2472,1:1624);
 % imagea = imread('Image_0001_a.tif');
 % imageb = imread('Image_0001_b.tif');
 
-% Variables
-pp = 4.4e-6;
-M = 0.04775;
-fstop = 5.6;
-ts = 73.72e-6;
-ws = 32;
-overlap = 8;
+% Variables [units]
+pp = 4.4e-6; % [meters]
+M = 0.04775; % []
+fstop = 5.6; % []
+ts = 73.72e-6; % [s]
+ws = 64; % [px]
+overlap = 16; % [px]
+search_win = 0.5*ws; % [px]
 
 % Get the size of the images
 [rows, cols] = size(imagea);
@@ -38,32 +37,52 @@ y = zeros(num_y, num_x);
 
 % Loop over each interrogation window
 for i = 1:num_y
-    text = sprintf('Running: Step %0.1f/%d',i,num_y);
+    text = sprintf('Running: Step %d/%d',i,num_y);
     disp(text)
     for j = 1:num_x
-        % Define the window region
+        % Define the Interrogation window
         x_start = (j-1) * step + 1;
         y_start = (i-1) * step + 1;
         x_end = x_start + ws - 1;
         y_end = y_start + ws - 1;
-           
-        % Extract the interrogation windows
-        win1 = imagea(y_start:y_end, x_start:x_end);
-        win2 = imageb(y_start:y_end, x_start:x_end);
+        win = imagea(y_start:y_end, x_start:x_end);
+
+        % Define the Search window
+        sxs = x_start - search_win;
+        if sxs<1
+            sxs=1;
+        end
+        sys = y_start - search_win;
+        if sys<1
+            sys=1;
+        end
+        sxe = x_end + search_win;
+        if sxe>cols
+            sxe=cols;
+        end
+        sye = y_end + search_win;
+        if sye>rows
+            sye=rows;
+        end
+        search_grid = imageb(sys:sye, sxs:sxe);
          
         % Compute the cross-correlation
-        C = normxcorr2(win1, win2);
+        C = normxcorr2(win, search_grid);
          
         % Find the peak in the cross-correlation matrix
         [max_y, max_x] = find(C == max(C(:)), 1);
          
-        % Calculate the displacement
-        dx = max_x - ws;
-        dy = max_y - ws;
+        % Calculate the pixel displacement
+        pdx = max_x - ws;
+        pdy = max_y - ws;
+
+        % Calculate physical displacement
+        dx = pdx*pp/M;
+        dy = pdy*pp/M;
             
-        % Store the displacement
-        u(i, j) = dx;
-        v(i, j) = dy;
+        % Store the velocity
+        u(i, j) = dx/ts;
+        v(i, j) = dy/ts;
             
         % Store the center position of the interrogation window
         x(i, j) = x_start + ws / 2;
@@ -71,7 +90,12 @@ for i = 1:num_y
     end
 end
 
-figure
+% % Show both images
+% montage({imagea,imageb})
+
+y=-y; %otherwise image will end up upside down for some reason
+
+figure Name velocity_field
 quiver(x, y, u, v, 'k')
 title('PIV Velocity Field')
 xlabel('X')
@@ -80,9 +104,9 @@ axis equal
 
 % Calculate the velocity magnitude
 velocity_magnitude = sqrt(u.^2 + v.^2);
- 
+
 % Create the contour plot
-figure;
+figure Name Contourf;
 contourf(x, y, velocity_magnitude, 20); % 20 levels of contours
 colorbar;
 title('Velocity Magnitude Contourf Map');
@@ -95,7 +119,7 @@ axis equal;
 % quiver(x, y, u, v, 'k');
 % hold off;
 
-figure;
+figure Name Contour;
 contour(x, y, velocity_magnitude, 20); % 20 levels of contours
 colorbar;
 title('Velocity Magnitude Contour Map');
