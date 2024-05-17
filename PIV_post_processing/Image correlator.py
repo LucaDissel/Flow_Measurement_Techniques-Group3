@@ -4,7 +4,7 @@ import os
 import sys
 
 # Directory containing the images
-folder_path = 'PIV data'
+folder_path = 'PIV_data'
 files = [os.path.join(folder_path, f'B0000{i}.tif') for i in range(1, 11)]
 
 # Initialize an array to accumulate the images
