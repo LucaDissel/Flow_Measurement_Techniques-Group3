@@ -1,0 +1,92 @@
+%% HWA Calibration
+clear;
+close all;
+
+%% Step 1: Read All Calibration files
+% Download calibration.txt_mat files
+filename = './Calibration/Calibration_%03d.txt_mat';
+
+yrange = 0:2:20;
+for ii = 1:numel(yrange)
+    fileOut = sprintf(filename,yrange(ii)); %fileOut = strcat(fileIn,');
+
+    % Read data from file and store 2nd column in voltage array
+    data = dlmread(fileOut);
+    voltage_calib(ii) = mean(data(:,2));
+end
+
+
+%% Step 2: Fit 4th order Polynomial
+x = voltage_calib;
+xplot = linspace(x(1),x(end),100);
+y = yrange;
+c = polyfit(x,y,4); %c is an array containing the polynomial coefficients
+
+% Plot the fitted polynomial
+figure; clf
+plot(x, y, 'bo', 'MarkerSize', 8, 'DisplayName', 'Original Data');
+hold on;
+yfit = polyval(c,xplot);
+plot(xplot, yfit, 'r-', 'LineWidth', 2, 'DisplayName', '4th-Order Polynomial');
+xlabel('Voltage V [Volts]');
+ylabel('Velocity U [m/s]');
+title('4th Order Polynomial Fit');
+legend('show', 'Location', 'southeast');
+
+% Print coefficients
+fprintf('Coefficients of the fitted polynomial (highest to lowest degree):\n');
+for i = 1:length(c)
+    fprintf('c%d: %.6f\n', length(c)-i, c(i));
+end
+
+
+
+%% Step 3: Calculate Sampling Time
+% Read Correlation Test File
+filename = 'CorrelationTest.txt';
+data = dlmread(filename,'',23,0);
+t = data(:,1);  % Time
+voltage = data(:,2);  % Voltage
+
+dt = t(2)-t(1); %timestep
+nt = numel(t); %number of samples
+
+voltage_mean = mean(voltage);
+%voltage_pp = voltage - voltage_mean; %Mean centering
+
+velocity = polyval(c,voltage); %calculate velocity from voltage using 4th order polynomial from above
+velocity_mean = mean(velocity);
+velocity_std = std(velocity)/2;
+velocity_pp = velocity - velocity_mean;
+
+fprintf('Mean Velocity      = %.6f\n', velocity_mean);
+fprintf('Std Dev Velocity   = %.6f\n', velocity_std);
+
+%Autocorrelation
+r = xcorr(velocity_pp); r = r/r(1);
+indz = find(r<=0); indz = indz(1);
+dtplot = abs(r(indz))/abs((r(indz-1)-r(indz))/dt);
+Ti = (t(indz)-dtplot);    %Integral Time Scale
+
+
+% %Autocorrelation from chatgpt, not working
+% [r, lags] = xcorr(velocity_pp, 'coeff');
+% 
+% % Find the integral time scale
+% indz = find(r <= 0, 1); % Find the first zero crossing
+% if isempty(indz)
+%     % If no zero crossing is found, use the first minimum
+%     [~, indz] = min(r);
+% end
+% Ti = abs(lags(indz));
+
+
+epsilon = 0.01;     %Error (want error <1%)
+coverage = 3;       %Coverage factor k (for 99.7% confidence, set k=3)
+N = ((coverage*velocity_std)/(velocity_mean*epsilon))^2; %No of uncorrelated samples
+%N = (coverage*0.5/12/epsilon)^2;
+T = 2*Ti*N;         %Sampling Time
+
+fprintf('Uncorr Samples N   = %.6f\n', N);
+fprintf('Sampling Time T    = %.6f\n', T);
+
