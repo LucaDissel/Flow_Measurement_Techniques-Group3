@@ -1,0 +1,102 @@
+%% HWA Processing:
+clear;
+close all;
+
+%% Step 1: Open and Read file data
+filename = 'Measurement_neg00_aoa0.txt';
+
+% Read data from file starting from line 23
+data = dlmread(filename,'',23,0);
+
+% Assign data to variables:
+t = data(:,1);  % Time
+u = data(:,2);  % Voltage
+
+
+
+%% Step 2: Plot Time Series
+dt = t(2)-t(1); %get timestep
+nt = numel(t); %get number of iterations/timesteps
+
+figure(1); clf; set(gcf, 'color', 'w', 'position', [10 100 500 420]); %Position: [px from left, px from bottom, width, height]
+
+% Plot U against T in seconds
+subplot(211)
+plot(t(1:nt), u(1:nt) - mean(u(1:nt)));
+grid on; xlabel('t [s]'); box on; ylabel('E [V]');
+set(gca, 'fontsize',12,'ylim',[-0.2 0.2],'ytick',-0.1:0.1:0.1);
+
+% Plot U against T in ms
+subplot(212)
+plot(t(1000:1200) * 1000, u(1000:1200) - mean(u(1:200)));
+grid on; xlabel('t [ms]'); box on; ylabel('E [V]');
+set(gca, 'fontsize',12,'ylim',[-0.2 0.2],'ytick',-0.1:0.1:0.1);
+hold on
+
+sgtitle('Time Series','fontweight','bold');
+
+
+
+%% Step 3: Calculations
+u_sub = u(1:nt);        %u_subset is the first nt elements of array u
+u_mean = mean(u(1:nt)); %calculate mean of u_sub
+u_std = std(u(1:nt));   %calculate std dev
+u_p = u-mean(u);        %mean-centering of array u
+u_pp = u_sub-u_mean;    %mean-centering of array u_sub
+% % Add calculations to plot from Step 2
+% subplot(211); hold on;
+% set(gca, 'fontsize',14);
+
+
+
+%% Step 4: Autocorrelation to fundamental frequency
+r = xcorr(u_pp);    %Compute cross correlation. Output r is a symmetric array
+r = r(nt:end);      %Only keep 2nd half of array, ie the positive part
+r = r/r(1);         %Normalise array by dividing by maximum value of r (max r occurs at 0 lag, ie at r(1))
+indz = find(r<=0); indz = indz(1); %Find 0 crossing point, then take first instance of 0 crossing
+dtplot = abs(r(indz))/abs((r(indz-1)-r(indz))/dt); %Linear interpolation to find a more accurate value of 0 crossing
+fi = 1/(t(indz)-dtplot);
+
+figure(2); clf; set(gcf,'color','w','position',[520 100 500 420]);
+
+% Subplot 1
+subplot(211);
+plot(t(1:nt)*1000,r)
+xlabel('time [ms]'); ylabel('\rho');
+set(gca, 'fontsize',12,'xlim',[0 50]); grid on; box on;
+hold on; plot((t(indz)-dtplot)*1000,0,'.','MarkerSize',20); %Mark first 0 crossing
+txtstr = sprintf('[T_I = %1.2f ms]',(t(indz)-dtplot)*1000);
+ht = annotation('textbox',[.74 .67 0.4 0.03],'String',txtstr,'HorizontalAlignment','left','FontSize',10,'EdgeColor','none');
+
+% Subplot 2
+subplot(212);
+semilogx(1./t(1:nt),r)  %plot log scale graph
+xlabel('time [ms]'); ylabel('\rho');
+set(gca, 'fontsize',12,'xlim',[1e1 1e4]); grid on; box on;
+hold on; semilogx(1/(t(indz)-dtplot),0,'.','markersize',20);
+txtstr = sprintf('[f = %4i Hz]',round(1/(t(indz)-dtplot)));
+ht = annotation('textbox',[.75 .2 0.4 0.03],'String',txtstr,'HorizontalAlignment','left','FontSize',10,'EdgeColor','none');
+
+sgtitle('Autocorrelation','fontweight','bold')
+
+
+
+%% Step 5: Power Spectral Density
+f_acq = 1/dt;   %acquiring frequency
+L = 10000;
+win = hann(L);
+Noverlap = L/2;
+[Pxx,freq] = pwelch(u_p,win,Noverlap,L,f_acq);
+
+figure(3); clf; set(gcf,'color','w','position',[1030 100 500 420]);
+loglog(freq,Pxx),grid on, xlabel('f [Hz]'),ylabel('PSD [m^2/s^2/Hz]')
+
+indz2 = find(Pxx == max(Pxx));
+hold on; loglog(freq(indz2),Pxx(indz2),'.','markersize',20);
+txtstr = sprintf('[f = %4i Hz]',round(freq(indz2)));
+ht = annotation('textbox',[.61 .895 0.4 0.03],'string',txtstr,'FitBoxToText','on','HorizontalAlignment','left','FontSize',10,'EdgeColor','none');
+set(gca,'fontsize',12,'xlim',[10 5e3])
+
+sgtitle('Power Spectral Density','fontweight','bold');
+
+
