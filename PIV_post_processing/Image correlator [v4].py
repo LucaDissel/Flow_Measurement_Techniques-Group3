@@ -297,8 +297,8 @@ y_end = int(y0 + ((num_windows_y + 1) / overlap) * window_size)
 # Plot velocity field
 plt.figure(figsize=(14, 8))
 cp = plt.contourf(X, Y, V, 500, levels=np.linspace(0, 15, 500), cmap='turbo', vmin=0, vmax=15, zorder=1)
-a = 6
-plt.quiver(X[::a, ::a], Y[::a, ::a], u[::a, ::a], v[::a, ::a], color='black', scale=400, zorder=2)
+a = 5
+plt.quiver(X[::a, ::a], Y[::a, ::a], u[::a, ::a], v[::a, ::a], color='black', scale=300, zorder=2)
 plt.gca().invert_yaxis()
 
 # Process mask for overlay
