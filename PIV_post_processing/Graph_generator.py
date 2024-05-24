@@ -37,15 +37,15 @@ else:
     
     if 'instant' in selected_data['instant/mean']:
         file_name = "B00001.dat"
-        title_prefix = "Instantaneous"
+        suffix = ""
     else:
         plot_type = input("Do you want to plot average [1] or the RMS [2]?: ")
         if plot_type == '1':
             file_name = "B00001.dat"
-            title_prefix = "Mean"
+            suffix = ""
         elif plot_type == '2':
             file_name = "B00002.dat"
-            title_prefix = "RMS"
+            suffix = "_RMS"
         else:
             print("Invalid selection. Please run the script again and choose [1] for average or [2] for RMS.")
             sys.exit()
@@ -104,9 +104,13 @@ X, Y = np.meshgrid(unique_x, unique_y)
 
 # Plot velocity field
 plt.figure(figsize=(14, 8))
-cp = plt.contourf(X, Y, V, 500, cmap='viridis', vmin=0, vmax=12, zorder=1)
+if selected_data['dt'] == 10:
+    vmax = 30
+else:
+    vmax = 15
+cp = plt.contourf(X, Y, V, 500, cmap='turbo', vmin=0, vmax=vmax, zorder=1)
 a = 5
-plt.quiver(X[::a, ::a], Y[::a, ::a], u[::a, ::a], v[::a, ::a], color='red', scale=400, zorder=2)
+plt.quiver(X[::a, ::a], Y[::a, ::a], u[::a, ::a], v[::a, ::a], color='black', scale=400, zorder=2)
 plt.gca().invert_yaxis()
 
 # Process mask for overlay
@@ -131,7 +135,12 @@ plt.imshow(mask_overlay_white, extent=[min(x), max(x), max(y), min(y)], aspect='
 # Final plot adjustments
 cbar = plt.colorbar(cp)
 cbar.set_label('Velocity in m/s', rotation=270, labelpad=15)
-plt.title(f'{title_prefix} velocity field at α={selected_data["AoA"]}°')
 plt.xlabel('X [mm]')
 plt.ylabel('Y [mm]')
+
+# Save the plot
+plot_filename = f"#{dataset_number}_AoA_{selected_data['AoA']}_WS_{selected_data['WS']}x{selected_data['WS']}_ov_{selected_data['ov']}_{selected_data['MP/SP']}_dt_{selected_data['dt']}_{selected_data['instant/mean']}{suffix}.pdf"
+plt.savefig(f"..\\Graphs\\{plot_filename}")
+
+# Show the plot
 plt.show()
