@@ -39,7 +39,7 @@ else:
         file_name = "B00001.dat"
         suffix = ""
     else:
-        plot_type = input("Do you want to plot average [1] or the RMS [2]?: ")
+        plot_type = input("Do you want to plot mean [1] or the RMS [2]?: ")
         if plot_type == '1':
             file_name = "B00001.dat"
             suffix = ""
@@ -47,11 +47,11 @@ else:
             file_name = "B00002.dat"
             suffix = "_RMS"
         else:
-            print("Invalid selection. Please run the script again and choose [1] for average or [2] for RMS.")
+            print("Invalid selection. Please run the script again and choose [1] for mean or [2] for RMS.")
             sys.exit()
     
     path = f"{base_path}\\{file_name}"
-    print(f"\nPath to the selected data file: {path}")
+    print(f"\nSelected data file: {path}")
 
 # ---------- Step 2: Process data file --------
 # Read data file
@@ -87,8 +87,9 @@ V = V.reshape(len(unique_y), len(unique_x))
 
 # ---------- Step 3: Load mask -----------
 # Define path to mask
-mask_path = f'..\\PIV_data\\masks\Mask_AoA_{selected_data["AoA"]}.tif'
-print(f"\nPath to selected mask: {mask_path}")
+mask_file_name = f'mask_AoA_{selected_data["AoA"]}.tif'
+mask_path = f'..\\PIV_data\\masks\\{mask_file_name}'
+print(f"\nSelected mask: {mask_path}")
 
 # Load mask
 mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
@@ -108,7 +109,7 @@ if selected_data['dt'] == 10:
     vmax = 30
 else:
     vmax = 15
-cp = plt.contourf(X, Y, V, 500, cmap='turbo', vmin=0, vmax=vmax, zorder=1)
+cp = plt.contourf(X, Y, V, 500, levels=np.linspace(0, vmax, 500), cmap='turbo', vmin=0, vmax=vmax, zorder=1)
 a = 5
 plt.quiver(X[::a, ::a], Y[::a, ::a], u[::a, ::a], v[::a, ::a], color='black', scale=400, zorder=2)
 plt.gca().invert_yaxis()
@@ -133,14 +134,15 @@ mask_overlay_white[mask == 0, :] = [255, 255, 255, 255]         # Set white colo
 plt.imshow(mask_overlay_white, extent=[min(x), max(x), max(y), min(y)], aspect='auto', zorder=3)
 
 # Final plot adjustments
-cbar = plt.colorbar(cp)
+cbar = plt.colorbar(cp, ticks=np.arange(0, vmax+1, vmax/15))
 cbar.set_label('Velocity in m/s', rotation=270, labelpad=15)
+cbar.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{int(x):d}'))
 plt.xlabel('X [mm]')
 plt.ylabel('Y [mm]')
 
 # Save the plot
-plot_filename = f"#{dataset_number}_AoA_{selected_data['AoA']}_WS_{selected_data['WS']}x{selected_data['WS']}_ov_{selected_data['ov']}_{selected_data['MP/SP']}_dt_{selected_data['dt']}_{selected_data['instant/mean']}{suffix}.pdf"
-plt.savefig(f"..\\Graphs\\{plot_filename}")
+plt_filename = f"#{dataset_number}_AoA_{selected_data['AoA']}_WS_{selected_data['WS']}x{selected_data['WS']}_ov_{selected_data['ov']}_{selected_data['MP/SP']}_dt_{selected_data['dt']}_{selected_data['instant/mean']}{suffix}.pdf"
+plt.savefig(f"..\\Graphs\\{plt_filename}")
 
-# Show the plot
-plt.show()
+# Confirmation
+print(f"\n{plt_filename} saved to ..\\Graphs\\")
