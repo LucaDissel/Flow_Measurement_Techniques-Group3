@@ -17,9 +17,6 @@ img_path = os.path.join(folder_path, 'B00001.tif')
 # Load image
 img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
-# Ensure pixel values are within 0-255
-img = np.clip(img, 0, 255).astype(np.uint8)
-
 # ---------- Step 2: Split image vertically ----------
 # Assuming two images are stacked vertically
 height = img.shape[0] // 2
@@ -47,7 +44,7 @@ if mask.shape != frame_a.shape or mask.shape != frame_b.shape:
 frame_a_masked = cv2.bitwise_and(frame_a, frame_a, mask=mask)
 frame_b_masked = cv2.bitwise_and(frame_b, frame_b, mask=mask)
 
-# ---------- Step 4: Compute number of windows ----------
+# ---------- Step 4: Descretize image in windows ----------
 # Define window and search sizes
 window_size = 32
 search_size = int(window_size * 1.5)
@@ -67,7 +64,7 @@ x0 = (cols - num_windows_x * window_size) // 2
 displacement_x = np.zeros((rows, cols))
 displacement_y = np.zeros((rows, cols))
 
-# ---------- Step 5: Cross-correlate ----------
+# ---------- Step 5: Cross-correlate two frames ----------
 for y in range(num_windows_y):
     for x in range(num_windows_x):
         # Define window in frame_a
@@ -92,7 +89,7 @@ for y in range(num_windows_y):
         displacement_x[start_y_a:start_y_a + window_size, start_x_a:start_x_a + window_size] = max_loc[0] - (search_size - window_size) // 2
         displacement_y[start_y_a:start_y_a + window_size, start_x_a:start_x_a + window_size] = max_loc[1] - (search_size - window_size) // 2
 
-# ---------- Step 6: Obtain flow velocity ----------
+# ---------- Step 6: Obtain flow velocities ----------
 # Constants for conversion
 pixel_pitch = 0.0000044         # meters
 magnification = 0.047754667     
@@ -143,7 +140,8 @@ mask_overlay_white[mask == 0, :] = [255, 255, 255, 255]         # Set white colo
 plt.imshow(mask_overlay_white[y_start:y_end, x_start:x_end], extent=[0, max(x), max(y), 0], aspect='auto', zorder=3)
 
 # Final plot adjustments
-plt.colorbar(cp)                                            
+cbar = plt.colorbar(cp)
+cbar.set_label('Velocity in m/s', rotation=270)
 plt.title('Instantaneous velocity field at α=15°')
 plt.xlabel('X [mm]')
 plt.ylabel('Y [mm]')
