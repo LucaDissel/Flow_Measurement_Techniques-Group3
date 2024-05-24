@@ -1,0 +1,203 @@
+%% HWA Calibration
+clear;
+close all;
+
+%% Step 1: Read All Calibration files
+% Download calibration.txt_mat files
+filename = './Calibration/Calibration_%03d.txt_mat';
+
+yrange = 0:2:20;
+for ii = 1:numel(yrange)
+    % fileIn = sprintf(filename,yrange(ii));
+    % delimiter = ' ';
+    % startrow = 23;
+    % formatSpec = '%s';
+    % fileID = fopen(fileIn,'r');
+    % tmp = textscan(fileID, formatSpec, 'Delimiter',delimiter,'TextType',string,'HeaderLines',startrow);
+    % fclose(fileID);
+    % tmp2 = strrep(tmp{1},',','.');
+    
+    fileOut = sprintf(filename,yrange(ii)); %fileOut = strcat(fileIn,');
+    % fileId = fopen(fileOut,'w');
+    % fprintf(fileId,'%s\n',tmp2);
+    % fclose(fileId);
+
+    % Read data from file and store 2nd column in voltage array
+    data = dlmread(fileOut);
+    voltage_calib(ii) = mean(data(:,2));
+end
+
+
+%% Step 2: Fit 4th order Polynomial
+x = voltage_calib;
+xplot = linspace(x(1),x(end),100);
+y = yrange;
+c = polyfit(x,y,4);
+yfit = polyval(c,xplot);
+
+% Plot the fitted polynomial
+figure(1); clf; set(gcf,'color','w','position',[1030 100 500 420]);
+plot(x, y, 'bo', 'MarkerSize', 8, 'DisplayName', 'Original Data');
+hold on;
+plot(xplot, yfit, 'r-', 'LineWidth', 2, 'DisplayName', '4th-Order Polynomial');
+xlabel('Voltage V [Volts]');
+ylabel('Velocity U [m/s]');
+title('4th Order Polynomial Fit');
+legend('show', 'Location', 'southeast');
+
+% Print coefficients
+fprintf('Coefficients of the fitted polynomial (highest to lowest degree):\n');
+for i = 1:length(c)
+    fprintf('c%d: %.6f\n', length(c)-i, c(i));
+end
+
+
+
+%% Step 3: Calculate Sampling Time
+% Read Correlation Test File
+filename = 'CorrelationTest.txt';
+data = dlmread(filename,'',23,0);
+t = data(:,1);  % Time
+voltage = data(:,2);  % Voltage
+
+dt = t(2)-t(1);
+nt = numel(t);
+
+voltage_mean = mean(voltage);
+%voltage_pp = voltage - voltage_mean;
+
+velocity = polyval(c,voltage);
+velocity_mean = mean(velocity);
+velocity_std = std(velocity)/2;
+velocity_pp = velocity - velocity_mean;
+
+fprintf('Mean Velocity      = %.6f\n', velocity_mean);
+fprintf('Std Dev Velocity   = %.6f\n', velocity_std);
+
+%Autocorrelation
+r = xcorr(velocity_pp); r = r/r(1);
+indz = find(r<=0); indz = indz(1);
+dtplot = abs(r(indz))/abs((r(indz-1)-r(indz))/dt);
+Ti = (t(indz)-dtplot);    %Integral Time Scale
+
+
+% %Robot Autocorrelation
+% [r, lags] = xcorr(velocity_pp, 'coeff');
+% 
+% % Find the integral time scale
+% indz = find(r <= 0, 1); % Find the first zero crossing
+% if isempty(indz)
+%     % If no zero crossing is found, use the first minimum
+%     [~, indz] = min(r);
+% end
+% Ti = abs(lags(indz));
+
+
+epsilon = 0.01;     %Error (want error <1%)
+coverage = 3;       %Coverage factor k (for 99.7% confidence, set k=3)
+N = ((coverage*velocity_std)/(velocity_mean*epsilon))^2; %No of uncorrelated samples
+%N = (coverage*0.5/12/epsilon)^2;
+T = 2*Ti*N;         %Sampling Time
+
+fprintf('Uncorr Samples N   = %.6f\n', N);
+fprintf('Sampling Time T    = %.6f\n', T);
+
+
+%% Step 4: Mean Velocity and Velocity Fluctuations
+
+%Define figures for each plot
+figure(2); clf; set(gcf, 'color', 'w', 'position', [10 100 500 420]); %Position: [px from left, px from bottom, width, height]
+axis([0, 12, -40, 40]);
+ylabel('Position [mm]');
+yticks(-40:10:40);
+xlabel('Velocity [m/s]');
+xticks(0:1:12);
+title('Mean Velocity Distribution');
+legend('show', 'Location', 'southwest');
+hold on; grid on;
+
+figure(3); clf; set(gcf, 'color', 'w', 'position', [520 110 500 420]); %Position: [px from left, px from bottom, width, height]
+axis([0, 3, -40, 40]);
+ylabel('Position [mm]');
+yticks(-40:10:40);
+xlabel('Velocity RMS [m/s]');
+xticks(0:0.5:3);
+title('Velocity Fluctuation_m');
+legend('show', 'Location', 'southeast');
+hold on; grid on;
+
+figure(4); clf; set(gcf, 'color', 'w', 'position', [520 90 500 420]); %Position: [px from left, px from bottom, width, height]
+axis([0, 3, -40, 40]);
+ylabel('Position [mm]');
+yticks(-40:10:40);
+xlabel('Velocity RMS [m/s]');
+xticks(0:0.5:3);
+title('Velocity Fluctuation');
+legend('show', 'Location', 'southeast');
+hold on; grid on;
+
+%Open Measurement files
+aoa = [0,5,15];
+yrange = -40:4:40;
+
+for i = 1:numel(aoa)
+    a = aoa(i);
+    for ii = 1:numel(yrange)
+        if yrange(ii) <=0
+            filedir = './HWA_aoa%d/Measurement_neg%02d_aoa%d.txt';
+        else
+            filedir = './HWA_aoa%d/Measurement_pos%02d_aoa%d.txt';
+        end
+        
+        % Read data from file starting from line 23
+        filename = sprintf(filedir,a,abs(yrange(ii)),a);
+        et = false;
+        try
+            data = dlmread(filename,'',23,0);
+        catch ME
+            dv = v_plot(ii-1)-v_plot(ii-2);
+            et = true;
+        end
+        
+        % Assign data to variables:
+        t = data(:,1);  % Time
+        u = data(:,2);  % Voltage
+        
+        %Calculate mean velocity from polynomial
+        v = polyval(c,u);
+        v_mean = mean(v);
+        v_plot(ii) = v_mean;
+        if et
+            v_plot(ii) = v_plot(ii-1)-dv;
+        end
+        
+        %Calculate vrms
+        v_flux = v-v_mean;
+        v_rms_m(ii) = sqrt(mean(v_flux.^2))/v_mean;
+        v_rms(ii) = sqrt(mean(v.^2))-v_mean;
+
+    end
+
+    %Plot velocity Distribution
+    figure(2)
+    name = sprintf('AOA = %d',a);
+    color = ['r','b','g'];
+    marker = ['s','o','x'];
+    plot(v_plot, yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
+    hold on;
+    
+    %Plot Velocity Fluctuations
+    figure(3)
+    name = sprintf('AOA = %d',a);
+    color = ['r','b','g'];
+    marker = ['s','o','x'];
+    plot(v_rms_m, yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
+    hold on;
+
+    figure(4)
+    name = sprintf('AOA = %d',a);
+    color = ['r','b','g'];
+    marker = ['s','o','x'];
+    plot(v_rms, yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
+    hold on;
+end
