@@ -1,11 +1,16 @@
-%% HWA Processing:
+%% HWA Processing_spectral series:
 clear;
 close all;
 
 %% Step 1: Open and Read file data
-filename = 'Measurement_neg00_aoa0.txt';
+%Input Parameters:
+aoa = 5;                %Angle of Attack (0, 5, 15)
+position = 'neg12';     %Position of interest (pos/neg followed by 2 digits)
+L = 10000;              %Hanning Window size for PSD (default 10000)
+Noverlap = L/2;         %Hanning Window overlap for PSD (default 50% overlap)
 
 % Read data from file starting from line 23
+filename = sprintf('./HWA_aoa%d/Measurement_%s_aoa%d.txt',aoa,position,aoa);
 data = dlmread(filename,'',23,0);
 
 % Assign data to variables:
@@ -83,9 +88,7 @@ sgtitle('Autocorrelation','fontweight','bold')
 
 %% Step 5: Power Spectral Density
 f_acq = 1/dt;   %acquiring frequency
-L = 10000;
 win = hann(L);
-Noverlap = L/2;
 [Pxx,freq] = pwelch(u_p,win,Noverlap,L,f_acq);
 
 figure(3); clf; set(gcf,'color','w','position',[1030 100 500 420]);
