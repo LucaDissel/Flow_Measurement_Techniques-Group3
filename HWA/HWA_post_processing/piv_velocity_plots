@@ -1,0 +1,130 @@
+%% Step 5: PIV Mean Velocity and Velocity Fluctuations
+
+%Define figures for each plot
+figure(5); clf; set(gcf, 'color', 'w', 'position', [10 300 500 420]); %Position: [px from left, px from bottom, width, height]
+%axis([0, 12, -40, 40]);
+ylabel('Position');
+%yticks(-40:10:40);
+xlabel('Abs Velocity [m/s]');
+%xticks(0:1:12);
+title('PIV Abs Velocity Distribution');
+legend('show', 'Location', 'southwest');
+hold on; grid on;
+
+
+figure(6); clf; set(gcf, 'color', 'w', 'position', [520 300 500 420]); %Position: [px from left, px from bottom, width, height]
+%axis([0, 3, -40, 40]);
+ylabel('Position');
+%yticks(-40:10:40);
+xlabel('Mean Velocity [m/s]');
+%xticks(0:0.5:3);
+title('PIV Mean Velocity Distribution');
+legend('show', 'Location', 'southwest');
+hold on; grid on;
+
+figure(7); clf; set(gcf, 'color', 'w', 'position', [1030 300 500 420]); %Position: [px from left, px from bottom, width, height]
+%axis([0, 3, -40, 40]);
+ylabel('Position');
+%yticks(-40:10:40);
+xlabel('Velocity RMS [m/s]');
+%xticks(0:0.5:3);
+title('PIV Velocity Fluctuation_m');
+legend('show', 'Location', 'southeast');
+hold on; grid on;
+
+
+%For Velocity Distribution
+%Open Measurement files
+aoa = [0,5,15];
+fprintf('=========== PIV ===========\n');
+
+for i = 1:numel(aoa)
+    a = aoa(i);
+    filename = sprintf('./pivdata_davis/B00001_aoa%d.dat',a);
+    data = readmatrix(filename,'Range',3);
+    
+    %Filter data to only x=3cm behind trailing edge (ie x = 132.9485)
+    condition = data(:, 1) > 132;
+    data = data(condition, :);
+    condition = data(:, 1) < 133;
+    data = data(condition, :);
+    condition = data(:, 2) > -40;
+    data = data(condition, :);
+
+    x = data(:,1);
+    y = data(:,2); 
+    dpx = data(:,3); 
+    dpy = data(:,4);
+    dp = horzcat(dpx,dpy);
+    V_scalar = sqrt(dpx.^2 + dpy.^2);
+    
+    fprintf('AOA = %d deg\n',a);
+    fprintf('x = %.6f\n',x(1));
+
+    %Plot Velocity distribution
+    figure(5)
+    name = sprintf('AOA = %d',a);
+    color = ['r','b','g'];
+    marker = ['s','o','x'];
+    plot(abs(dpx), y, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
+    hold on;
+end
+
+%Mean velocity
+for i = 1:numel(aoa)
+    a = aoa(i);
+    filename = sprintf('./pivdata_davis/B00001_mean_aoa%d.dat',a);
+    data = readmatrix(filename,'Range',3);
+    
+    %Filter data to only x=3cm behind trailing edge (x=132.9485)
+    condition = data(:, 1) > 132;
+    data = data(condition, :);
+    condition = data(:, 1) < 133;
+    data = data(condition, :);
+    condition = data(:, 2) > -40;
+    data = data(condition, :);
+
+    x = data(:,1);
+    y = data(:,2); 
+    dpx = data(:,3); 
+    dpy = data(:,4);
+    dp = horzcat(dpx,dpy);
+    V_mean_scalar = sqrt(dpx.^2 + dpy.^2);
+
+    %Plot Velocity Magnitude
+    figure(6)
+    name = sprintf('AOA = %d',a);
+    color = ['r','b','g'];
+    marker = ['s','o','x'];
+    plot(dpx, y, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
+    hold on;
+end
+
+%For RMS fluctuation
+for i = 1:numel(aoa)
+    a = aoa(i);
+    filename = sprintf('./pivdata_davis/B00002_aoa%d.dat',a);
+    data = readmatrix(filename,'Range',3);
+    
+    %Filter data to only x=3cm behind trailing edge (x=132.9485)
+    condition = data(:, 1) > 132;
+    data = data(condition, :);
+    condition = data(:, 1) < 133;
+    data = data(condition, :);
+    condition = data(:, 2) > -40;
+    data = data(condition, :);
+
+    x = data(:,1);
+    y = data(:,2); 
+    dpx = data(:,3); 
+    dpy = data(:,4);
+    
+    %Plot Velocity Fluctuations
+    figure(7)
+    name = sprintf('AOA = %d',a);
+    color = ['r','b','g'];
+    marker = ['s','o','x'];
+    plot(dpx, y, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
+    hold on;
+
+end
