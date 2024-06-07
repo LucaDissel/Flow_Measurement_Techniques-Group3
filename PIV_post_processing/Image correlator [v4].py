@@ -148,9 +148,11 @@ for img_path in files:
 
 # ---------- Step 3: Obtain flow velocities ----------
 # Constants for conversion
-pixel_pitch = 0.0000044         # meters
-magnification = 0.047754667     
-dt = 0.000075                   # seconds
+pixel_pitch = 0.0000044                 # meters
+magnification = 0.047754667
+cor = 1.32578693                        # correction factor
+magnification = magnification / cor     # correction for difference in calibration 
+dt = 0.000075                           # seconds
 
 # Compute average displacements
 avg_dx = total_dx / len(files)
