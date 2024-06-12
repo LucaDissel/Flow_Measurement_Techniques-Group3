@@ -419,3 +419,34 @@ ylabel('Distance from Surface (m)');
 title('Shear Layer Identification');
 legend('Velocity Profile', 'Shear Layer');
 grid on;
+
+
+-------------------------------------------------------------------------------
+%% PIV Quiver plot - to adjust y-coordinate for PIV DaVis data
+
+% 0 for velocity vectors at x/c = 1.3, 1 for full field velocity vector plot
+yes=1
+
+aoa = [0,5,15]; 
+for i = 1:numel(aoa)
+    a = aoa(i);
+    filename = sprintf('./pivdata_davis/B00001_aoa%d.dat',a);
+    data = readmatrix(filename,'Range',3);
+    
+    if yes = 0
+        condition = data(:, 1) > 132;
+        data = data(condition, :);
+        condition = data(:, 1) < 133;
+        data = data(condition, :);
+    end
+
+    x = data(:,1);
+    y = data(:,2); 
+    y=y-32.332916; %Shift y down by 32.3329mm
+    dpx = data(:,3); 
+    dpy = data(:,4);
+    dp = horzcat(dpx,dpy);
+
+    figure (i+10); clf; set(gcf,'position',[(10+510*(i-1)) 100 500 420]);
+    quiver(x,y,dpx,dpy);
+end
