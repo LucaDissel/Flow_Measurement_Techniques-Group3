@@ -19,7 +19,7 @@ data = dlmread(filename,'',23,0);
 t = data(:,1);  % Time
 u = data(:,2);  % Voltage
 
-% % For Reading PIV:
+% % For Reading DAVIS PIV data:
 % filename = sprintf('./pivdata_davis/B00001_aoa%d.dat',aoa);
 % data = readmatrix(filename,'Range',3);
 % 
@@ -64,9 +64,6 @@ u_mean = mean(u(1:nt)); %calculate mean of u_sub
 u_std = std(u(1:nt));   %calculate std dev
 u_p = u-mean(u);        %mean-centering of array u
 u_pp = u_sub-u_mean;    %mean-centering of array u_sub
-% % Add calculations to plot from Step 2
-% subplot(211); hold on;
-% set(gca, 'fontsize',14);
 
 
 ---------------------------------------------------------------------------------------------
