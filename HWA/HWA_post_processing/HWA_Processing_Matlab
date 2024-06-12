@@ -2,23 +2,39 @@
 clear;
 close all;
 
+-------------------------------------------------------------------------------------------
 %% Step 1: Open and Read file data
 %Input Parameters:
-aoa = 5;                %Angle of Attack (0, 5, 15)
-position = 'neg12';     %Position of interest (pos/neg followed by 2 digits)
+aoa = 15;                %Angle of Attack (0, 5, 15)
+position = 'pos24';     %Position of interest (pos/neg followed by 2 digits) %shear layer y=+24
 L = 10000;              %Hanning Window size for PSD (default 10000)
 Noverlap = L/2;         %Hanning Window overlap for PSD (default 50% overlap)
 
 % Read data from file starting from line 23
 filename = sprintf('./HWA_aoa%d/Measurement_%s_aoa%d.txt',aoa,position,aoa);
+%filename = 'CorrelationTest.txt';
 data = dlmread(filename,'',23,0);
 
 % Assign data to variables:
 t = data(:,1);  % Time
 u = data(:,2);  % Voltage
 
+% % For Reading PIV:
+% filename = sprintf('./pivdata_davis/B00001_aoa%d.dat',aoa);
+% data = readmatrix(filename,'Range',3);
+% 
+% %Filter data to only x=3cm behind trailing edge (ie x = 132.9485)
+% condition = data(:, 1) > 132;
+% data = data(condition, :);
+% condition = data(:, 1) < 133;
+% data = data(condition, :);
+% condition = data(:, 2) < 72.332916;
+% data = data(condition, :);
+% condition = data(:, 2) > -(10-2.332916);
+% data = data(condition, :);
 
 
+---------------------------------------------------------------------------------------------------------------
 %% Step 2: Plot Time Series
 dt = t(2)-t(1); %get timestep
 nt = numel(t); %get number of iterations/timesteps
@@ -38,10 +54,10 @@ grid on; xlabel('t [ms]'); box on; ylabel('E [V]');
 set(gca, 'fontsize',12,'ylim',[-0.2 0.2],'ytick',-0.1:0.1:0.1);
 hold on
 
-sgtitle('Time Series','fontweight','bold');
+%sgtitle('Time Series','fontweight','bold');
 
 
-
+---------------------------------------------------------------------------------------------------------------------
 %% Step 3: Calculations
 u_sub = u(1:nt);        %u_subset is the first nt elements of array u
 u_mean = mean(u(1:nt)); %calculate mean of u_sub
@@ -53,7 +69,7 @@ u_pp = u_sub-u_mean;    %mean-centering of array u_sub
 % set(gca, 'fontsize',14);
 
 
-
+---------------------------------------------------------------------------------------------
 %% Step 4: Autocorrelation to fundamental frequency
 r = xcorr(u_pp);    %Compute cross correlation. Output r is a symmetric array
 r = r(nt:end);      %Only keep 2nd half of array, ie the positive part
@@ -82,10 +98,10 @@ hold on; semilogx(1/(t(indz)-dtplot),0,'.','markersize',20);
 txtstr = sprintf('[f = %4i Hz]',round(1/(t(indz)-dtplot)));
 ht = annotation('textbox',[.75 .2 0.4 0.03],'String',txtstr,'HorizontalAlignment','left','FontSize',10,'EdgeColor','none');
 
-sgtitle('Autocorrelation','fontweight','bold')
+%sgtitle('Autocorrelation','fontweight','bold')
 
 
-
+------------------------------------------------------------------------------------------------------------
 %% Step 5: Power Spectral Density
 f_acq = 1/dt;   %acquiring frequency
 win = hann(L);
@@ -100,6 +116,4 @@ txtstr = sprintf('[f = %4i Hz]',round(freq(indz2)));
 ht = annotation('textbox',[.61 .895 0.4 0.03],'string',txtstr,'FitBoxToText','on','HorizontalAlignment','left','FontSize',10,'EdgeColor','none');
 set(gca,'fontsize',12,'xlim',[10 5e3])
 
-sgtitle('Power Spectral Density','fontweight','bold');
-
-
+%sgtitle('Power Spectral Density','fontweight','bold');
