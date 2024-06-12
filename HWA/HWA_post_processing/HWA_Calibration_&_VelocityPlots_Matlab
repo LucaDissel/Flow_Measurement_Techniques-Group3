@@ -433,7 +433,7 @@ for i = 1:numel(aoa)
     filename = sprintf('./pivdata_davis/B00001_aoa%d.dat',a);
     data = readmatrix(filename,'Range',3);
     
-    if yes = 0
+    if yes == 0
         condition = data(:, 1) > 132;
         data = data(condition, :);
         condition = data(:, 1) < 133;
