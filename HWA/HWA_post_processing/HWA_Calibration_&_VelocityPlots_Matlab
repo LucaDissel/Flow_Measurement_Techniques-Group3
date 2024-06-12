@@ -1,6 +1,5 @@
 %% HWA Calibration
 clear;
-close all;
 
 %% Step 1: Read All Calibration files
 % Download calibration.txt_mat files
@@ -8,8 +7,19 @@ filename = './Calibration/Calibration_%03d.txt_mat';
 
 yrange = 0:2:20;
 for ii = 1:numel(yrange)
+    % fileIn = sprintf(filename,yrange(ii));
+    % delimiter = ' ';
+    % startrow = 23;
+    % formatSpec = '%s';
+    % fileID = fopen(fileIn,'r');
+    % tmp = textscan(fileID, formatSpec, 'Delimiter',delimiter,'TextType',string,'HeaderLines',startrow);
+    % fclose(fileID);
+    % tmp2 = strrep(tmp{1},',','.');
     
     fileOut = sprintf(filename,yrange(ii)); %fileOut = strcat(fileIn,');
+    % fileId = fopen(fileOut,'w');
+    % fprintf(fileId,'%s\n',tmp2);
+    % fclose(fileId);
 
     % Read data from file and store 2nd column in voltage array
     data = dlmread(fileOut);
@@ -17,6 +27,7 @@ for ii = 1:numel(yrange)
 end
 
 
+---------------------------------------------------------------------------
 %% Step 2: Fit 4th order Polynomial
 x = voltage_calib;
 xplot = linspace(x(1),x(end),100);
@@ -24,24 +35,27 @@ y = yrange;
 c = polyfit(x,y,4);
 yfit = polyval(c,xplot);
 
-% Plot the fitted polynomial
-figure(1); clf; set(gcf,'color','w','position',[1030 100 500 420]);
-plot(x, y, 'bo', 'MarkerSize', 8, 'DisplayName', 'Original Data');
-hold on;
-plot(xplot, yfit, 'r-', 'LineWidth', 2, 'DisplayName', '4th-Order Polynomial');
-xlabel('Voltage V [Volts]');
-ylabel('Velocity U [m/s]');
-title('4th Order Polynomial Fit');
-legend('show', 'Location', 'southeast');
-
 % Print coefficients
 fprintf('Coefficients of the fitted polynomial (highest to lowest degree):\n');
+L = [];
 for i = 1:length(c)
     fprintf('c%d: %.6f\n', length(c)-i, c(i));
+    L(i) = c(i);
 end
 
+% Plot the fitted polynomial
+figure(1); clf; set(gcf,'color','w','position',[1030 100 500 420]);
+plot(y, x, 'bo', 'MarkerSize', 8, 'DisplayName', 'Original Data');
+hold on;
+plot(yfit, xplot, 'r-', 'LineWidth', 2, 'DisplayName', '4th-Order Polynomial');
+ylabel('Voltage V [Volts]');
+xlabel('Velocity U [m/s]');
+name = sprintf('U = %.3f V^4 + %.3f V^3 + %.3f V^2 + %.3f V + %.3f',L(1),L(2),L(3),L(4),L(5));
+title(name);
+legend('show', 'Location', 'southeast');
 
 
+------------------------------------------------------------------------------------------
 %% Step 3: Calculate Sampling Time
 % Read Correlation Test File
 filename = 'CorrelationTest.txt';
@@ -65,10 +79,35 @@ fprintf('Mean Velocity      = %.6f\n', velocity_mean);
 fprintf('Std Dev Velocity   = %.6f\n', velocity_std);
 
 %Autocorrelation
-r = xcorr(velocity_pp); r = r/r(1);
-indz = find(r<=0); indz = indz(1);
-dtplot = abs(r(indz))/abs((r(indz-1)-r(indz))/dt);
-Ti = (t(indz)-dtplot);    %Integral Time Scale
+r = xcorr(velocity_pp);    %Compute cross correlation. Output r is a symmetric array
+r = r(nt:end);      %Only keep 2nd half of array, ie the positive part
+r = r/r(1);         %Normalise array by dividing by maximum value of r (max r occurs at 0 lag, ie at r(1))
+indz = find(r<=0); indz = indz(1); %Find 0 crossing point, then take first instance of 0 crossing
+dtplot = abs(r(indz))/abs((r(indz-1)-r(indz))/dt); %Linear interpolation to find a more accurate value of 0 crossing
+Ti = (t(indz)-dtplot);    %Integral Time Scale, adjusted for linear interpolation
+
+
+figure(21); clf; set(gcf,'color','w','position',[520 100 500 420]);
+
+% Subplot 1
+subplot(211);
+plot(t(1:nt)*1000,r)
+xlabel('time [ms]'); ylabel('\rho');
+set(gca, 'fontsize',12,'xlim',[0 50]); grid on; box on;
+hold on; plot((t(indz)-dtplot)*1000,0,'.','MarkerSize',20); %Mark first 0 crossing
+txtstr = sprintf('[T_I = %1.2f ms]',(t(indz)-dtplot)*1000);
+ht = annotation('textbox',[.17 .72 0.4 0.03],'String',txtstr,'HorizontalAlignment','left','FontSize',10,'EdgeColor','none');
+
+% Subplot 2
+subplot(212);
+semilogx(1./t(1:nt),r)  %plot log scale graph
+xlabel('frequency [Hz]'); ylabel('\rho');
+set(gca, 'fontsize',12,'xlim',[1e1 1e4]); grid on; box on;
+hold on; semilogx(1/(t(indz)-dtplot),0,'.','markersize',20);
+txtstr = sprintf('[f = %4i Hz]',round(1/(2*(t(indz)-dtplot))));
+ht = annotation('textbox',[.5 .2 0.4 0.03],'String',txtstr,'HorizontalAlignment','left','FontSize',10,'EdgeColor','none');
+
+%sgtitle('Autocorrelation','fontweight','bold')
 
 epsilon = 0.01;     %Error (want error <1%)
 coverage = 3;       %Coverage factor k (for 99.7% confidence, set k=3)
@@ -76,221 +115,307 @@ N = ((coverage*velocity_std)/(velocity_mean*epsilon))^2; %No of uncorrelated sam
 %N = (coverage*0.5/12/epsilon)^2;
 T = 2*Ti*N;         %Sampling Time
 
+
+fprintf('T_zeroCross        = %.6f\n', (t(indz)-dtplot)*1000);
 fprintf('Uncorr Samples N   = %.6f\n', N);
 fprintf('Sampling Time T    = %.6f\n', T);
 
 
+---------------------------------------------------------------------------------------------------------------
 %% Step 4: HWA Mean Velocity and Velocity Fluctuations
 
-%Define figures for each plot
-figure(2); clf; set(gcf, 'color', 'w', 'position', [10 100 500 420]); %Position: [px from left, px from bottom, width, height]
-axis([0, 12, -40, 40]);
-ylabel('Position [mm]');
-yticks(-40:10:40);
-xlabel('Velocity [m/s]');
-xticks(0:1:12);
-title('HWA Mean Velocity Distribution');
-legend('show', 'Location', 'southwest');
-hold on; grid on;
+yes=0; %toggle switch
 
-figure(3); clf; set(gcf, 'color', 'w', 'position', [520 100 500 420]); %Position: [px from left, px from bottom, width, height]
-axis([0, 3, -40, 40]);
-ylabel('Position [mm]');
-yticks(-40:10:40);
-xlabel('Velocity RMS [m/s]');
-xticks(0:0.5:3);
-title('HWA Velocity Fluctuation_m');
-legend('show', 'Location', 'southeast');
-hold on; grid on;
-
-%Open Measurement files
-aoa = [0,5,15];
-yrange = -40:4:40;
-
-for i = 1:numel(aoa)
-    a = aoa(i);
-    for ii = 1:numel(yrange)
-        if yrange(ii) <=0
-            filedir = './HWA_aoa%d/Measurement_neg%02d_aoa%d.txt';
-        else
-            filedir = './HWA_aoa%d/Measurement_pos%02d_aoa%d.txt';
-        end
-        
-        % Read data from file starting from line 23
-        filename = sprintf(filedir,a,abs(yrange(ii)),a);
-        et = false;
-        try
-            data = dlmread(filename,'',23,0);
-        catch ME
-            dv = v_plot(ii-1)-v_plot(ii-2);
-            et = true;
-        end
-        
-        % Assign data to variables:
-        t = data(:,1);  % Time
-        u = data(:,2);  % Voltage
-        
-        %Calculate mean velocity from polynomial
-        v = polyval(c,u);
-        v_mean = mean(v);
-        v_plot(ii) = v_mean;
-        if et
-            v_plot(ii) = v_plot(ii-1)-dv;
-        end
-        
-        %Calculate vrms
-        v_flux = v-v_mean;
-        v_rms_m(ii) = sqrt(mean(v_flux.^2))/v_mean;
-        v_rms(ii) = sqrt(mean(v.^2))-v_mean;
-
-    end
-
-    %Plot velocity Distribution
-    figure(2)
-    name = sprintf('AOA = %d',a);
-    color = ['r','b','g'];
-    marker = ['s','o','x'];
-    plot(v_plot, yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
-    hold on;
+if yes == 1
+    %Define figures for each plot
+    figure(2); clf; set(gcf, 'color', 'w', 'position', [10 100 500 420]); %Position: [px from left, px from bottom, width, height]
+    axis([0, 12, -40, 40]);
+    ylabel('Position [mm]');
+    yticks(-40:10:40);
+    xlabel('Velocity [m/s]');
+    xticks(0:1:12);
+    %title('HWA Mean Velocity Distribution');
+    legend('show', 'Location', 'southwest');
+    hold on; grid on;
     
-    %Plot Velocity Fluctuations
-    figure(3)
-    name = sprintf('AOA = %d',a);
-    color = ['r','b','g'];
-    marker = ['s','o','x'];
-    plot(v_rms_m, yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
-    hold on;
-
+    figure(3); clf; set(gcf, 'color', 'w', 'position', [520 100 500 420]); %Position: [px from left, px from bottom, width, height]
+    axis([0, 3, -40, 40]);
+    ylabel('Position [mm]');
+    yticks(-40:10:40);
+    xlabel('Velocity RMS [m/s]');
+    xticks(0:0.5:3);
+    %title('HWA Velocity Fluctuation_m');
+    legend('show', 'Location', 'southeast');
+    hold on; grid on;
+    
+    %Open Measurement files
+    aoa = [0,5,15];
+    yrange = -40:4:40;
+    
+    for i = 1:numel(aoa)
+        a = aoa(i);
+        for ii = 1:numel(yrange)
+            if yrange(ii) <=0
+                filedir = './HWA_aoa%d/Measurement_neg%02d_aoa%d.txt';
+            else
+                filedir = './HWA_aoa%d/Measurement_pos%02d_aoa%d.txt';
+            end
+            
+            % Read data from file starting from line 23
+            filename = sprintf(filedir,a,abs(yrange(ii)),a);
+            et = false;
+            try
+                data = dlmread(filename,'',23,0);
+            catch ME
+                dv = v_plot(ii-1)-v_plot(ii-2);
+                et = true;
+            end
+            
+            % Assign data to variables:
+            t = data(:,1);  % Time
+            u = data(:,2);  % Voltage
+            
+            %Calculate mean velocity from polynomial
+            v = polyval(c,u);
+            v_mean = mean(v);
+            v_plot(ii) = v_mean;
+            if et
+                v_plot(ii) = v_plot(ii-1)-dv;
+            end
+            
+            %Calculate vrms
+            v_flux = v-v_mean;
+            v_rms_m(ii) = sqrt(mean(v_flux.^2));
+            %v_rms(ii) = sqrt(mean(v.^2))-v_mean;
+    
+        end
+    
+        %Plot velocity Distribution
+        figure(2)
+        name = sprintf('HWA AOA = %d',a);
+        color = ['r','b','g'];
+        marker = ['s','o','x'];
+        %plot(v_plot, -yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
+        plot(v_plot, -yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i));
+        hold on;
+        
+        %Plot Velocity Fluctuations
+        figure(3)
+        name = sprintf('HWA AOA = %d',a);
+        color = ['r','b','g'];
+        marker = ['s','o','x'];
+        %plot(v_rms_m, -yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
+        plot(v_rms_m, -yrange, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i));
+        hold on;
+    end
 end
 
-
+---------------------------------------------------------------------------------
 %% Step 5: PIV Mean Velocity and Velocity Fluctuations
 
-%Define figures for each plot
-figure(5); clf; set(gcf, 'color', 'w', 'position', [10 300 500 420]); %Position: [px from left, px from bottom, width, height]
-%axis([0, 12, -40, 40]);
-ylabel('Position');
-%yticks(-40:10:40);
-xlabel('Abs Velocity [m/s]');
-%xticks(0:1:12);
-title('PIV Abs Velocity Distribution');
-legend('show', 'Location', 'southwest');
-hold on; grid on;
+yes = 0; %toggle switch
 
-
-figure(6); clf; set(gcf, 'color', 'w', 'position', [520 300 500 420]); %Position: [px from left, px from bottom, width, height]
-%axis([0, 3, -40, 40]);
-ylabel('Position');
-%yticks(-40:10:40);
-xlabel('Mean Velocity [m/s]');
-%xticks(0:0.5:3);
-title('PIV Mean Velocity Distribution');
-legend('show', 'Location', 'southwest');
-hold on; grid on;
-
-figure(7); clf; set(gcf, 'color', 'w', 'position', [1030 300 500 420]); %Position: [px from left, px from bottom, width, height]
-%axis([0, 3, -40, 40]);
-ylabel('Position');
-%yticks(-40:10:40);
-xlabel('Velocity RMS [m/s]');
-%xticks(0:0.5:3);
-title('PIV Velocity Fluctuation_m');
-legend('show', 'Location', 'southeast');
-hold on; grid on;
-
-
-%For Velocity Distribution
-%Open Measurement files
-aoa = [0,5,15];
-fprintf('=========== PIV ===========\n');
-
-for i = 1:numel(aoa)
-    a = aoa(i);
-    filename = sprintf('./pivdata_davis/B00001_aoa%d.dat',a);
-    data = readmatrix(filename,'Range',3);
+if yes ==1
+    %Define figures for each plot
+    figure(5); clf; set(gcf, 'color', 'w', 'position', [10 300 500 420]); %Position: [px from left, px from bottom, width, height]
+    %axis([0, 12, -40, 40]);
+    ylabel('Position [mm]');
+    %yticks(-40:10:40);
+    xlabel('Abs Velocity [m/s]');
+    %xticks(0:1:12);
+    %title('PIV Abs Velocity Distribution');
+    legend('show', 'Location', 'southwest');
+    hold on; grid on;
     
-    %Filter data to only x=3cm behind trailing edge (ie x = 132.9485)
-    condition = data(:, 1) > 132;
-    data = data(condition, :);
-    condition = data(:, 1) < 133;
-    data = data(condition, :);
-    condition = data(:, 2) > -40;
-    data = data(condition, :);
-
-    x = data(:,1);
-    y = data(:,2); 
-    dpx = data(:,3); 
-    dpy = data(:,4);
-    dp = horzcat(dpx,dpy);
-    V_scalar = sqrt(dpx.^2 + dpy.^2);
     
-    fprintf('AOA = %d deg\n',a);
-    fprintf('x = %.6f\n',x(1));
-
-    %Plot Velocity distribution
-    figure(5)
-    name = sprintf('AOA = %d',a);
-    color = ['r','b','g'];
-    marker = ['s','o','x'];
-    plot(abs(dpx), y, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
-    hold on;
+    figure(6); clf; set(gcf, 'color', 'w', 'position', [520 300 500 420]); %Position: [px from left, px from bottom, width, height]
+    %axis([0, 3, -40, 40]);
+    ylabel('Position [mm]');
+    %yticks(-40:10:40);
+    xlabel('Mean Velocity [m/s]');
+    %xticks(0:0.5:3);
+    %title('PIV Mean Velocity Distribution');
+    legend('show', 'Location', 'southwest');
+    hold on; grid on;
+    
+    figure(7); clf; set(gcf, 'color', 'w', 'position', [1030 300 500 420]); %Position: [px from left, px from bottom, width, height]
+    %axis([0, 3, -40, 40]);
+    ylabel('Position [mm]');
+    %yticks(-40:10:40);
+    xlabel('Velocity RMS [m/s]');
+    %xticks(0:0.5:3);
+    %title('PIV Velocity Fluctuation_m');
+    legend('show', 'Location', 'southeast');
+    hold on; grid on;
+    
+    
+    %For Velocity Distribution
+    %Open Measurement files
+    aoa = [0,5,15];
+    fprintf('=========== PIV ===========\n');
+    
+    for i = 1:numel(aoa)
+        a = aoa(i);
+        filename = sprintf('./pivdata_davis/B00001_aoa%d.dat',a);
+        data = readmatrix(filename,'Range',3);
+        
+        %Filter data to only x=3cm behind trailing edge (ie x = 132.9485)
+        condition = data(:, 1) > 132;
+        data = data(condition, :);
+        condition = data(:, 1) < 133;
+        data = data(condition, :);
+        condition = data(:, 2) < 72.332916;
+        data = data(condition, :);
+        condition = data(:, 2) > -(10-2.332916);
+        data = data(condition, :);
+    
+        x = data(:,1);
+        y = data(:,2);
+        y=y-32.332916;
+        dpx = data(:,3); 
+        dpy = data(:,4);
+        dp = horzcat(dpx,dpy);
+        V_scalar = sqrt(dpx.^2 + dpy.^2);
+        
+        fprintf('AOA = %d deg\n',a);
+        fprintf('x = %.6f\n',x(1));
+    
+        %Plot Velocity distribution
+        figure(5)
+        name = sprintf('PIV AOA = %d',a);
+        color = ['r','b','g'];
+        marker = ['s','o','x'];
+        plot(abs(dpx), y, 'LineStyle', '--', 'LineWidth', 1, 'DisplayName', name,'Color',color(i));
+        hold on;
+    end
+    
+    %Mean velocity
+    for i = 1:numel(aoa)
+        a = aoa(i);
+        filename = sprintf('./pivdata_davis/B00001_mean_aoa%d.dat',a);
+        data = readmatrix(filename,'Range',3);
+        
+        %Filter data to only x=3cm behind trailing edge (x=132.9485)
+        condition = data(:, 1) > 132;
+        data = data(condition, :);
+        condition = data(:, 1) < 133;
+        data = data(condition, :);
+        condition = data(:, 2) < 72.332916;
+        data = data(condition, :);
+        condition = data(:, 2) > -(10-2.332916);
+        data = data(condition, :);
+    
+        x = data(:,1);
+        y = data(:,2);
+        y=y-32.332916;
+        dpx = data(:,3); 
+        dpy = data(:,4);
+        dp = horzcat(dpx,dpy);
+        V_mean_scalar = sqrt(dpx.^2 + dpy.^2);
+    
+        %Plot Velocity Magnitude
+        figure(6)
+        name = sprintf('PIV AOA = %d',a);
+        color = ['r','b','g'];
+        marker = ['s','o','x'];
+        plot(dpx, y, 'LineStyle', '--', 'LineWidth', 1, 'DisplayName', name,'Color',color(i));
+        hold on;
+    end
+    
+    %For RMS fluctuation
+    for i = 1:numel(aoa)
+        a = aoa(i);
+        filename = sprintf('./pivdata_davis/B00002_aoa%d.dat',a);
+        data = readmatrix(filename,'Range',3);
+        
+        %Filter data to only x=3cm behind trailing edge (x=132.9485)
+        condition = data(:, 1) > 132;
+        data = data(condition, :);
+        condition = data(:, 1) < 133;
+        data = data(condition, :);
+        condition = data(:, 2) < 72.332916;
+        data = data(condition, :);
+        condition = data(:, 2) > -(10-2.332916);
+        data = data(condition, :);
+    
+        x = data(:,1);
+        y = data(:,2);
+        y=y-32.332916;
+        dpx = data(:,3); 
+        dpy = data(:,4);
+        
+        %Plot Velocity Fluctuations
+        figure(7)
+        name = sprintf('PIV AOA = %d',a);
+        color = ['r','b','g'];
+        marker = ['s','o','x'];
+        plot(dpx, y, 'LineStyle', '--', 'LineWidth', 1, 'DisplayName', name,'Color',color(i));
+        hold on;
+    
+    end
 end
 
-%Mean velocity
-for i = 1:numel(aoa)
-    a = aoa(i);
-    filename = sprintf('./pivdata_davis/B00001_mean_aoa%d.dat',a);
-    data = readmatrix(filename,'Range',3);
-    
-    %Filter data to only x=3cm behind trailing edge (x=132.9485)
-    condition = data(:, 1) > 132;
-    data = data(condition, :);
-    condition = data(:, 1) < 133;
-    data = data(condition, :);
-    condition = data(:, 2) > -40;
-    data = data(condition, :);
+-------------------------------------------------------------------------------------
+%% HWA AOA15 shear layer calculation
+yrange = -40:4:40;
+a = 15;
+for ii = 1:numel(yrange)
+    if yrange(ii) <=0
+        filedir = './HWA_aoa%d/Measurement_neg%02d_aoa%d.txt';
+    else
+        filedir = './HWA_aoa%d/Measurement_pos%02d_aoa%d.txt';
+    end
 
-    x = data(:,1);
-    y = data(:,2); 
-    dpx = data(:,3); 
-    dpy = data(:,4);
-    dp = horzcat(dpx,dpy);
-    V_mean_scalar = sqrt(dpx.^2 + dpy.^2);
+    % Read data from file starting from line 23
+    filename = sprintf(filedir,a,abs(yrange(ii)),a);
+    et = false;
+    try
+        data = dlmread(filename,'',23,0);
+    catch ME
+        dv = v_plot(ii-1)-v_plot(ii-2);
+        et = true;
+    end
 
-    %Plot Velocity Magnitude
-    figure(6)
-    name = sprintf('AOA = %d',a);
-    color = ['r','b','g'];
-    marker = ['s','o','x'];
-    plot(dpx, y, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
-    hold on;
+    % Assign data to variables:
+    t = data(:,1);  % Time
+    u = data(:,2);  % Voltage
+
+    %Calculate mean velocity from polynomial
+    v = polyval(c,u);
+    v_mean = mean(v);
+    v_plot(ii) = v_mean;
+    if et
+        v_plot(ii) = v_plot(ii-1)-dv;
+    end
+
+
+ 
 end
 
-%For RMS fluctuation
-for i = 1:numel(aoa)
-    a = aoa(i);
-    filename = sprintf('./pivdata_davis/B00002_aoa%d.dat',a);
-    data = readmatrix(filename,'Range',3);
-    
-    %Filter data to only x=3cm behind trailing edge (x=132.9485)
-    condition = data(:, 1) > 132;
-    data = data(condition, :);
-    condition = data(:, 1) < 133;
-    data = data(condition, :);
-    condition = data(:, 2) > -40;
-    data = data(condition, :);
+% Calculate the velocity gradient
+dv_dy = diff(v_plot) ./ diff(yrange);
 
-    x = data(:,1);
-    y = data(:,2); 
-    dpx = data(:,3); 
-    dpy = data(:,4);
-    
-    %Plot Velocity Fluctuations
-    figure(7)
-    name = sprintf('AOA = %d',a);
-    color = ['r','b','g'];
-    marker = ['s','o','x'];
-    plot(dpx, y, 'r-', 'LineWidth', 1, 'DisplayName', name,'Color',color(i),'Marker',marker(i),'MarkerSize',5);
-    hold on;
+% Midpoints of y for gradient values
+y_mid = (yrange(1:end-1) + yrange(2:end)) / 2;
 
-end
+% Plot the velocity gradient
+figure(20);
+plot(dv_dy, -y_mid, '-o');
+xlabel('Velocity Gradient (dv/dy)');
+ylabel('Position (mm)');
+%title('Velocity Gradient Profile');
+grid on;
+
+% Identify shear layer
+shear_layer_indices = find(max(abs(dv_dy)));
+
+% Highlight shear layer regions on the velocity profile
+figure(21);
+plot(v_plot, -yrange, '-o');
+hold on;
+plot(v_plot(shear_layer_indices), -y_mid(shear_layer_indices), 'ro');
+xlabel('Velocity (m/s)');
+ylabel('Distance from Surface (m)');
+title('Shear Layer Identification');
+legend('Velocity Profile', 'Shear Layer');
+grid on;
